@@ -1,0 +1,9 @@
+
+### Obtener los operarios
+GET http://localhost:3000/api/operarios
+Content-Type: application/json
+
+### Obtener un operario por ID
+
+GET http://localhost:3000/api/operarios/departamento/1
+Content-Type: application/json

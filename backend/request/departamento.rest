@@ -1,0 +1,3 @@
+
+### Obtener todos los departamentos
+GET http://localhost:3000/api/departamentos

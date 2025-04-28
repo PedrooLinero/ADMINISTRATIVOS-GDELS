@@ -1,0 +1,10 @@
+# Dependencias
+node_modules/
+*/node_modules/
+
+# Archivos de entorno
+.env
+*.env
+
+# Sistemas operativos
+.DS_Store

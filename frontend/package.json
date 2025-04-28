@@ -10,8 +10,16 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@fontsource/roboto": "^5.2.5",
+    "@fortawesome/fontawesome-free": "^6.7.2",
+    "@mui/icons-material": "^7.0.2",
+    "@mui/material": "^7.0.2",
+    "mdb-react-ui-kit": "^9.0.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-router": "^7.5.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
