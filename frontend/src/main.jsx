@@ -11,12 +11,17 @@ import "@fontsource/roboto/500.css";
 import "@fontsource/roboto/700.css";
 
 import Home from "./pages/Home";
+import PantallaInicio from "./components/PantallaInicio";
 
 let router = createHashRouter([
   {
     path: "/",
     element: <Home />,
   },
+  {
+    path: "/pantalla-inicio",
+    element: <PantallaInicio />,
+  }
 
 ]);
 

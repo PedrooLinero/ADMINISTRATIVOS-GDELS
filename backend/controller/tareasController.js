@@ -54,6 +54,33 @@ class TareasController {
         );
     }
   }
+
+  // Tareas por departamento
+  async getTareasByDepartamento(req, res) {
+    try {
+      logMensaje("Entrando en getTareasByDepartamento");
+      const departamentoId = req.params.departamentoId;
+      const tareas = await Tareas.findAll({
+        where: { id_departamento: departamentoId }, // Cambiado a id_departamento
+      });
+      if (!tareas || tareas.length === 0) {
+        return res.status(404).json(
+          Respuesta.error(null, `No se encontraron tareas para el departamento ${departamentoId}`)
+        );
+      }
+      res.json(Respuesta.exito(tareas, `Tareas del departamento ${departamentoId} recuperadas`));
+    } catch (err) {
+      logMensaje(`Error en getTareasByDepartamento: ${err.message}`);
+      res
+        .status(500)
+        .json(
+          Respuesta.error(
+            null,
+            `Error al recuperar las tareas del departamento: ${req.originalUrl}`
+          )
+        );
+    }
+  }
 }
 
 module.exports = new TareasController();

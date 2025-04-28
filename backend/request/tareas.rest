@@ -8,3 +8,7 @@ Content-Type: application/json
 ### Obtener una tarea por ID (ejemplo con id=1)
 GET http://localhost:3000/api/tareas/1
 Content-Type: application/json
+
+### Obtener tareas por departamento (ejemplo con departamento=1)
+GET http://localhost:3000/api/tareas/departamento/1
+Content-Type: application/json
