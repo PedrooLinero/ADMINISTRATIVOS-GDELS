@@ -11,15 +11,26 @@ import {
   FormHelperText,
 } from "@mui/material";
 import { useEffect, useState } from "react";
-import { apiUrl } from "../config"; // Asegúrate de que la ruta sea correcta
+import { apiUrl } from "../config";
 
 function PantallaInicio() {
-  const [departamentoId, setDepartamentoId] = useState(""); // Estado para el ID del departamento seleccionado
-  const [departamentos, setDepartamentos] = useState([]); // Estado para los departamentos cargados
-  const [tareas, setTareas] = useState([]); // Estado para las tareas cargadas
-  const [tarea, setTarea] = useState(""); // Estado para la tarea seleccionada
-  const [operario, setOperario] = useState(""); // Estado para el operario
-  const [operarioError, setOperarioError] = useState(""); // Estado para errores de validación
+  const [departamentoId, setDepartamentoId] = useState("");
+  const [departamentos, setDepartamentos] = useState([]);
+  const [tareas, setTareas] = useState([]);
+  const [tarea, setTarea] = useState("");
+  const [esOtraTarea, setEsOtraTarea] = useState(false);
+  const [descripcionOtraTarea, setDescripcionOtraTarea] = useState("");
+  const [descripcionError, setDescripcionError] = useState("");
+  const [operario, setOperario] = useState("");
+  const [operarioError, setOperarioError] = useState("");
+  const [cantidades, setCantidades] = useState(""); // Nuevo estado para cantidades
+  const [cantidadesError, setCantidadesError] = useState(""); // Error para cantidades
+  const [tiempo, setTiempo] = useState(""); // Nuevo estado para tiempo
+  const [tiempoError, setTiempoError] = useState(""); // Error para tiempo
+  const [registros, setRegistros] = useState([]); // Estado para almacenar todos los registros
+  const [tiempoTotal, setTiempoTotal] = useState(0); // Tiempo acumulado
+
+  const JORNADA_TOTAL_MINUTOS = 460; // Máximo de minutos por jornada
 
   // Cargar departamentos al montar el componente
   useEffect(() => {
@@ -34,7 +45,7 @@ function PantallaInicio() {
 
         if (response.ok) {
           let data = await response.json();
-          setDepartamentos(data.datos); // Asumiendo que los datos vienen en `data.datos`
+          setDepartamentos(data.datos);
         }
       } catch (error) {
         console.error("Error al obtener departamentos:", error);
@@ -49,21 +60,18 @@ function PantallaInicio() {
     async function getTareas() {
       if (departamentoId) {
         try {
-          let response = await fetch(
-            `${apiUrl}/tareas/departamento/${departamentoId}`,
-            {
-              method: "GET",
-              headers: {
-                "Content-Type": "application/json",
-              },
-            }
-          );
+          let response = await fetch(`${apiUrl}/tareas/departamento/${departamentoId}`, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
 
           if (response.ok) {
             let data = await response.json();
-            setTareas(data.datos); // Asumiendo que las tareas vienen en `data.datos`
+            setTareas(data.datos || []);
           } else {
-            setTareas([]); // Limpiar tareas si no hay datos
+            setTareas([]);
             console.error("No se encontraron tareas para el departamento");
           }
         } catch (error) {
@@ -71,7 +79,7 @@ function PantallaInicio() {
           setTareas([]);
         }
       } else {
-        setTareas([]); // Limpiar tareas si no hay departamento seleccionado
+        setTareas([]);
       }
     }
 
@@ -81,12 +89,37 @@ function PantallaInicio() {
   // Manejar el cambio del departamento seleccionado
   const handleDepartamentoChange = (event) => {
     setDepartamentoId(event.target.value);
-    setTarea(""); // Reiniciar la tarea seleccionada al cambiar el departamento
+    setTarea("");
+    setEsOtraTarea(false);
+    setDescripcionOtraTarea("");
+    setDescripcionError("");
   };
 
   // Manejar el cambio de la tarea seleccionada
   const handleTareaChange = (event) => {
-    setTarea(event.target.value);
+    const tareaId = event.target.value;
+    setTarea(tareaId);
+
+    const tareaSeleccionada = tareas.find((t) => t.id === tareaId);
+    if (tareaSeleccionada && tareaSeleccionada.es_otra_tarea) {
+      setEsOtraTarea(true);
+    } else {
+      setEsOtraTarea(false);
+      setDescripcionOtraTarea("");
+      setDescripcionError("");
+    }
+  };
+
+  // Manejar el cambio de la descripción de "otra tarea"
+  const handleDescripcionChange = (event) => {
+    const value = event.target.value;
+    setDescripcionOtraTarea(value);
+
+    if (esOtraTarea && value.trim() === "") {
+      setDescripcionError("La descripción es obligatoria para esta tarea");
+    } else {
+      setDescripcionError("");
+    }
   };
 
   // Manejar el cambio del operario
@@ -94,7 +127,6 @@ function PantallaInicio() {
     const value = event.target.value;
     setOperario(value);
 
-    // Validar que no exceda 4 caracteres
     if (value.length > 4) {
       setOperarioError("El código de operario debe tener máximo 4 caracteres");
     } else {
@@ -102,23 +134,124 @@ function PantallaInicio() {
     }
   };
 
+  // Manejar el cambio de cantidades gestionadas
+  const handleCantidadesChange = (event) => {
+    const value = event.target.value;
+    // Permitir solo números enteros
+    if (/^\d*$/.test(value)) {
+      setCantidades(value);
+      if (value === "" || parseInt(value) <= 0) {
+        setCantidadesError("Debe introducir un número mayor que 0");
+      } else {
+        setCantidadesError("");
+      }
+    }
+  };
+
+  // Manejar el cambio del tiempo empleado
+  const handleTiempoChange = (event) => {
+    const value = event.target.value;
+    // Permitir solo números enteros
+    if (/^\d*$/.test(value)) {
+      setTiempo(value);
+      const tiempoNum = parseInt(value) || 0;
+      const nuevoTiempoTotal = tiempoTotal + tiempoNum;
+
+      if (value === "" || tiempoNum <= 0) {
+        setTiempoError("Debe introducir un número mayor que 0");
+      } else if (nuevoTiempoTotal > JORNADA_TOTAL_MINUTOS) {
+        setTiempoError(
+          `El tiempo total no puede exceder ${JORNADA_TOTAL_MINUTOS} minutos (restante: ${
+            JORNADA_TOTAL_MINUTOS - tiempoTotal
+          } minutos)`
+        );
+      } else {
+        setTiempoError("");
+      }
+    }
+  };
+
   // Función para manejar el envío del formulario
   const handleSubmit = () => {
+    // Validar el operario
     if (operario.length > 4) {
       setOperarioError("El código de operario debe tener máximo 4 caracteres");
       return;
     }
 
-    // Aquí puedes añadir la lógica para enviar los datos al backend
-    console.log("Datos a enviar:", {
+    // Validar la descripción si es "otra tarea"
+    if (esOtraTarea && descripcionOtraTarea.trim() === "") {
+      setDescripcionError("La descripción es obligatoria para esta tarea");
+      return;
+    }
+
+    // Validar cantidades
+    const cantidadesNum = parseInt(cantidades) || 0;
+    if (cantidades === "" || cantidadesNum <= 0) {
+      setCantidadesError("Debe introducir un número mayor que 0");
+      return;
+    }
+
+    // Validar tiempo
+    const tiempoNum = parseInt(tiempo) || 0;
+    const nuevoTiempoTotal = tiempoTotal + tiempoNum;
+    if (tiempo === "" || tiempoNum <= 0) {
+      setTiempoError("Debe introducir un número mayor que 0");
+      return;
+    }
+    if (nuevoTiempoTotal > JORNADA_TOTAL_MINUTOS) {
+      setTiempoError(
+        `El tiempo total no puede exceder ${JORNADA_TOTAL_MINUTOS} minutos (restante: ${
+          JORNADA_TOTAL_MINUTOS - tiempoTotal
+        } minutos)`
+      );
+      return;
+    }
+
+    // Datos a enviar
+    const datos = {
       departamentoId,
       tarea,
       operario,
-    });
+      cantidades: cantidadesNum,
+      tiempo: tiempoNum,
+    };
+    if (esOtraTarea) {
+      datos.descripcionOtraTarea = descripcionOtraTarea;
+    }
+
+    // Agregar el registro al array de registros
+    setRegistros([...registros, datos]);
+    setTiempoTotal(nuevoTiempoTotal);
+
+    console.log("Registro enviado:", datos);
+    console.log("Registros totales:", [...registros, datos]);
+    console.log("Tiempo total acumulado:", nuevoTiempoTotal);
 
     // Limpiar los campos después del envío
     setOperario("");
     setTarea("");
+    setEsOtraTarea(false);
+    setDescripcionOtraTarea("");
+    setDescripcionError("");
+    setCantidades("");
+    setCantidadesError("");
+    setTiempo("");
+    setTiempoError("");
+  };
+
+  // Función para finalizar la jornada
+  const handleFinalizarJornada = () => {
+    console.log("Jornada finalizada. Registros finales:", registros);
+    console.log("Tiempo total acumulado:", tiempoTotal);
+    // Aquí puedes redirigir al usuario o mostrar un mensaje de finalización
+    alert(
+      `Jornada finalizada con un total de ${tiempoTotal} minutos registrados.`
+    );
+    // Reiniciar el formulario
+    setRegistros([]);
+    setTiempoTotal(0);
+    setDepartamentoId("");
   };
 
   return (
@@ -131,6 +264,15 @@ function PantallaInicio() {
         Bienvenido a la Administración GDELS
       </Typography>
 
+      {/* Mostrar tiempo acumulado y restante */}
+      <Typography
+        variant="h6"
+        sx={{ textAlign: "center", marginBottom: "20px" }}
+      >
+        Tiempo acumulado: {tiempoTotal} minutos | Tiempo restante:{" "}
+        {Math.max(0, JORNADA_TOTAL_MINUTOS - tiempoTotal)} minutos
+      </Typography>
+
       {/* Select de departamentos */}
       <FormControl fullWidth sx={{ marginBottom: "20px" }}>
         <InputLabel id="departamento-select-label">Departamento</InputLabel>
@@ -140,6 +282,7 @@ function PantallaInicio() {
           value={departamentoId}
           label="Departamento"
           onChange={handleDepartamentoChange}
+          disabled={tiempoTotal >= JORNADA_TOTAL_MINUTOS}
         >
           <MenuItem value="">
             <em>Seleccione un departamento</em>
@@ -152,25 +295,11 @@ function PantallaInicio() {
         </Select>
       </FormControl>
 
-      {/* Campo para introducir operario */}
-      <FormControl fullWidth sx={{ marginBottom: "20px" }}>
-        <TextField
-          id="operario-input"
-          label="Código de Operario"
-          variant="outlined"
-          value={operario}
-          onChange={handleOperarioChange}
-          inputProps={{ maxLength: 4 }} // Limita la entrada a 4 caracteres
-          error={!!operarioError}
-          helperText={operarioError || "Introduzca máximo 4 caracteres"}
-        />
-      </FormControl>
-
       {/* Select de tareas */}
       <FormControl
         fullWidth
         sx={{ marginBottom: "20px" }}
-        disabled={!departamentoId}
+        disabled={!departamentoId || tiempoTotal >= JORNADA_TOTAL_MINUTOS}
       >
         <InputLabel id="tarea-select-label">Tarea</InputLabel>
         <Select
@@ -185,23 +314,123 @@ function PantallaInicio() {
           </MenuItem>
           {tareas.map((tarea) => (
             <MenuItem key={tarea.id} value={tarea.id}>
-              {tarea.nombre_tarea}{" "}
-              {/* Cambia tarea.nombre por tarea.nombre_tarea */}
+              {tarea.nombre_tarea}
             </MenuItem>
           ))}
         </Select>
       </FormControl>
 
-      {/* Botón para enviar */}
-      <Button
-        variant="contained"
-        color="primary"
-        fullWidth
-        onClick={handleSubmit}
-        disabled={!departamentoId || !tarea || !operario || !!operarioError}
-      >
-        Guardar
-      </Button>
+      {/* Campo para la descripción de "otra tarea" (condicional) */}
+      {esOtraTarea && (
+        <FormControl fullWidth sx={{ marginBottom: "20px" }}>
+          <TextField
+            id="descripcion-input"
+            label="Descripción de la Tarea"
+            variant="outlined"
+            value={descripcionOtraTarea}
+            onChange={handleDescripcionChange}
+            multiline
+            rows={3}
+            error={!!descripcionError}
+            helperText={descripcionError || "Explique la tarea realizada"}
+            disabled={tiempoTotal >= JORNADA_TOTAL_MINUTOS}
+          />
+        </FormControl>
+      )}
+
+      {/* Campo para introducir operario */}
+      <FormControl fullWidth sx={{ marginBottom: "20px" }}>
+        <TextField
+          id="operario-input"
+          label="Código de Operario"
+          variant="outlined"
+          value={operario}
+          onChange={handleOperarioChange}
+          inputProps={{ maxLength: 4 }}
+          error={!!operarioError}
+          helperText={operarioError || "Introduzca máximo 4 caracteres"}
+          disabled={tiempoTotal >= JORNADA_TOTAL_MINUTOS}
+        />
+      </FormControl>
+
+      {/* Campo para introducir cantidades gestionadas */}
+      <FormControl fullWidth sx={{ marginBottom: "20px" }}>
+        <TextField
+          id="cantidades-input"
+          label="Cantidades Gestionadas"
+          variant="outlined"
+          value={cantidades}
+          onChange={handleCantidadesChange}
+          type="text"
+          error={!!cantidadesError}
+          helperText={cantidadesError || "Introduzca un número entero"}
+          disabled={tiempoTotal >= JORNADA_TOTAL_MINUTOS}
+        />
+      </FormControl>
+
+      {/* Campo para introducir tiempo empleado */}
+      <FormControl fullWidth sx={{ marginBottom: "20px" }}>
+        <TextField
+          id="tiempo-input"
+          label="Tiempo Empleado (minutos)"
+          variant="outlined"
+          value={tiempo}
+          onChange={handleTiempoChange}
+          type="text"
+          error={!!tiempoError}
+          helperText={
+            tiempoError ||
+            `Introduzca un número entero (máximo restante: ${
+              JORNADA_TOTAL_MINUTOS - tiempoTotal
+            } minutos)`
+          }
+          disabled={tiempoTotal >= JORNADA_TOTAL_MINUTOS}
+        />
+      </FormControl>
+
+      {/* Botones */}
+      <Box sx={{ display: "flex", gap: "10px" }}>
+        <Button
+          variant="contained"
+          color="primary"
+          fullWidth
+          onClick={handleSubmit}
+          disabled={
+            !departamentoId ||
+            !tarea ||
+            !operario ||
+            !!operarioError ||
+            (esOtraTarea && !descripcionOtraTarea.trim()) ||
+            !!cantidadesError ||
+            !!tiempoError ||
+            tiempoTotal >= JORNADA_TOTAL_MINUTOS
+          }
+        >
+          Guardar
+        </Button>
+        <Button
+          variant="outlined"
+          color="secondary"
+          fullWidth
+          onClick={handleFinalizarJornada}
+          disabled={registros.length === 0}
+        >
+          Finalizar Jornada
+        </Button>
+      </Box>
+
+      {/* Resumen de registros (opcional) */}
+      {registros.length > 0 && (
+        <Box sx={{ marginTop: "20px" }}>
+          <Typography variant="h6">Registros Enviados:</Typography>
+          {registros.map((registro, index) => (
+            <Typography key={index} variant="body2">
+              - Tarea {registro.tarea} (Depto: {registro.departamentoId}) | Operario: {registro.operario} | Cantidades: {registro.cantidades} | Tiempo: {registro.tiempo} min
+              {registro.descripcionOtraTarea && ` | Descripción: ${registro.descripcionOtraTarea}`}
+            </Typography>
+          ))}
+        </Box>
+      )}
     </Box>
   );
 }
