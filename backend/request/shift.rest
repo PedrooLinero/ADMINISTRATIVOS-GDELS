@@ -1,0 +1,56 @@
+# Prueba para guardar un registro de jornada (POST /api/shift/save-shift)
+POST http://localhost:3000/api/shift/save-shift
+Content-Type: application/json
+
+{
+  "operario": "P344",
+  "departamento": "Recepción",
+  "tarea": "Tarea 55",
+  "cantidades": 10,
+  "tiempo": 80,
+  "descripcion": "Descripción opcional de la tarea"
+}
+
+### Otro registro de jornada
+POST http://localhost:3000/api/shift/save-shift
+Content-Type: application/json
+
+{
+    "operario": "P345",
+    "departamento": "Producción",
+    "tarea": "Tarea 56",
+    "cantidades": 20,
+    "tiempo": 90,
+    "descripcion": "Descripción opcional de la tarea"
+}
+
+### Otro registro de jornada
+POST http://localhost:3000/api/shift/save-shift
+Content-Type: application/json
+
+{
+    "operario": "P346",
+    "departamento": "Calidad",
+    "tarea": "Tarea 57",
+    "cantidades": 30,
+    "tiempo": 100,
+    "descripcion": "Descripción opcional de la tarea"
+}
+
+### Otro registro de jornada
+POST http://localhost:3000/api/shift/save-shift
+Content-Type: application/json
+    
+    {
+        "operario": "P347",
+        "departamento": "Logística",
+        "tarea": "Tarea 58",
+        "cantidades": 40,
+        "tiempo": 110,
+        "descripcion": "Descripción opcional de la tarea"
+    }
+
+### 
+
+# Prueba para descargar el archivo Excel (GET /api/shift/download-excel)
+GET http://localhost:3000/api/shift/download-excel
