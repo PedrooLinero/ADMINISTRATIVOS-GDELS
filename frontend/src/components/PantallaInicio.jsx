@@ -10,19 +10,22 @@ import {
   Button,
   FormHelperText,
 } from "@mui/material";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { apiUrl } from "../config"; // Asegúrate de que la ruta sea correcta
 
 function PantallaInicio() {
-  const [departamento, setDepartamento] = React.useState(""); // Estado para el departamento seleccionado
-  const [departamentos, setDepartamentos] = React.useState([]); // Estado para los departamentos cargados
-  const [operario, setOperario] = React.useState(""); // Estado para el operario
-  const [operarioError, setOperarioError] = React.useState(""); // Estado para errores de validación
+  const [departamentoId, setDepartamentoId] = useState(""); // Estado para el ID del departamento seleccionado
+  const [departamentos, setDepartamentos] = useState([]); // Estado para los departamentos cargados
+  const [tareas, setTareas] = useState([]); // Estado para las tareas cargadas
+  const [tarea, setTarea] = useState(""); // Estado para la tarea seleccionada
+  const [operario, setOperario] = useState(""); // Estado para el operario
+  const [operarioError, setOperarioError] = useState(""); // Estado para errores de validación
 
+  // Cargar departamentos al montar el componente
   useEffect(() => {
     async function getDepartamentos() {
       try {
-        let response = await fetch(apiUrl + "/departamentos", {
+        let response = await fetch(`${apiUrl}/departamentos`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -41,9 +44,49 @@ function PantallaInicio() {
     getDepartamentos();
   }, []);
 
+  // Cargar tareas cuando cambie el departamento seleccionado
+  useEffect(() => {
+    async function getTareas() {
+      if (departamentoId) {
+        try {
+          let response = await fetch(
+            `${apiUrl}/tareas/departamento/${departamentoId}`,
+            {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          if (response.ok) {
+            let data = await response.json();
+            setTareas(data.datos); // Asumiendo que las tareas vienen en `data.datos`
+          } else {
+            setTareas([]); // Limpiar tareas si no hay datos
+            console.error("No se encontraron tareas para el departamento");
+          }
+        } catch (error) {
+          console.error("Error al obtener tareas:", error);
+          setTareas([]);
+        }
+      } else {
+        setTareas([]); // Limpiar tareas si no hay departamento seleccionado
+      }
+    }
+
+    getTareas();
+  }, [departamentoId]);
+
   // Manejar el cambio del departamento seleccionado
-  const handleChange = (event) => {
-    setDepartamento(event.target.value);
+  const handleDepartamentoChange = (event) => {
+    setDepartamentoId(event.target.value);
+    setTarea(""); // Reiniciar la tarea seleccionada al cambiar el departamento
+  };
+
+  // Manejar el cambio de la tarea seleccionada
+  const handleTareaChange = (event) => {
+    setTarea(event.target.value);
   };
 
   // Manejar el cambio del operario
@@ -68,21 +111,18 @@ function PantallaInicio() {
 
     // Aquí puedes añadir la lógica para enviar los datos al backend
     console.log("Datos a enviar:", {
-      departamento,
+      departamentoId,
+      tarea,
       operario,
     });
 
-    // Limpiar el campo después del envío
+    // Limpiar los campos después del envío
     setOperario("");
+    setTarea("");
   };
 
   return (
     <Box sx={{ padding: "16px" }}>
-      {/* Barra de navegación */}
-      <Box
-        sx={{ display: "flex", justifyContent: "center", marginBottom: "20px" }}
-      ></Box>
-
       {/* Título */}
       <Typography
         variant="h4"
@@ -97,12 +137,15 @@ function PantallaInicio() {
         <Select
           labelId="departamento-select-label"
           id="departamento-select"
-          value={departamento}
+          value={departamentoId}
           label="Departamento"
-          onChange={handleChange} // Manejar el cambio del departamento
+          onChange={handleDepartamentoChange}
         >
+          <MenuItem value="">
+            <em>Seleccione un departamento</em>
+          </MenuItem>
           {departamentos.map((dep) => (
-            <MenuItem key={dep.id} value={dep.nombre}>
+            <MenuItem key={dep.id} value={dep.id}>
               {dep.nombre}
             </MenuItem>
           ))}
@@ -123,13 +166,39 @@ function PantallaInicio() {
         />
       </FormControl>
 
+      {/* Select de tareas */}
+      <FormControl
+        fullWidth
+        sx={{ marginBottom: "20px" }}
+        disabled={!departamentoId}
+      >
+        <InputLabel id="tarea-select-label">Tarea</InputLabel>
+        <Select
+          labelId="tarea-select-label"
+          id="tarea-select"
+          value={tarea}
+          label="Tarea"
+          onChange={handleTareaChange}
+        >
+          <MenuItem value="">
+            <em>Seleccione una tarea</em>
+          </MenuItem>
+          {tareas.map((tarea) => (
+            <MenuItem key={tarea.id} value={tarea.id}>
+              {tarea.nombre_tarea}{" "}
+              {/* Cambia tarea.nombre por tarea.nombre_tarea */}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
       {/* Botón para enviar */}
       <Button
         variant="contained"
         color="primary"
         fullWidth
         onClick={handleSubmit}
-        disabled={!departamento || !operario || !!operarioError}
+        disabled={!departamentoId || !tarea || !operario || !!operarioError}
       >
         Guardar
       </Button>
