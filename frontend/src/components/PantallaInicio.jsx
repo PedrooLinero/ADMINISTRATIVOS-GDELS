@@ -8,7 +8,10 @@ import {
   Typography,
   TextField,
   Button,
-  FormHelperText,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import { useEffect, useState } from "react";
 import { apiUrl } from "../config";
@@ -29,444 +32,254 @@ function PantallaInicio() {
   const [tiempoError, setTiempoError] = useState("");
   const [registros, setRegistros] = useState([]);
   const [tiempoTotal, setTiempoTotal] = useState(0);
-  const [errorMessage, setErrorMessage] = useState(""); // Estado para mensajes de error
+  const [errorMessage, setErrorMessage] = useState("");
+  const [modalAbierto, setModalAbierto] = useState(false);
 
   const JORNADA_TOTAL_MINUTOS = 460;
 
-  // Cargar departamentos al montar el componente
+  // Carga inicial de departamentos
   useEffect(() => {
-    async function getDepartamentos() {
+    (async () => {
       try {
-        let response = await fetch(`${apiUrl}/departamentos`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-        if (response.ok) {
-          let data = await response.json();
-          setDepartamentos(data.datos);
-        } else {
-          setErrorMessage("Error al cargar los departamentos");
-        }
-      } catch (error) {
-        console.error("Error al obtener departamentos:", error);
-        setErrorMessage("Error al conectar con el servidor para cargar departamentos");
+        const res = await fetch(`${apiUrl}/departamentos`);
+        if (!res.ok) throw new Error();
+        const { datos } = await res.json();
+        setDepartamentos(datos);
+      } catch {
+        setErrorMessage("Error al cargar departamentos");
       }
-    }
-    getDepartamentos();
+    })();
   }, []);
 
-  // Cargar tareas cuando cambie el departamento seleccionado
+  // Carga tareas según departamento
   useEffect(() => {
-    async function getTareas() {
-      if (departamentoId) {
-        try {
-          let response = await fetch(`${apiUrl}/tareas/departamento/${departamentoId}`, {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          });
-          if (response.ok) {
-            let data = await response.json();
-            setTareas(data.datos || []);
-          } else {
-            setTareas([]);
-            setErrorMessage("No se encontraron tareas para el departamento");
-          }
-        } catch (error) {
-          console.error("Error al obtener tareas:", error);
-          setTareas([]);
-          setErrorMessage("Error al conectar con el servidor para cargar tareas");
-        }
-      } else {
-        setTareas([]);
+    setTareas([]);
+    if (!departamentoId) return;
+    (async () => {
+      try {
+        const res = await fetch(`${apiUrl}/tareas/departamento/${departamentoId}`);
+        if (!res.ok) throw new Error();
+        const { datos } = await res.json();
+        setTareas(datos || []);
+      } catch {
+        setErrorMessage("Error al cargar tareas");
       }
-    }
-    getTareas();
+    })();
   }, [departamentoId]);
 
-  // Manejar el cambio del departamento seleccionado
-  const handleDepartamentoChange = (event) => {
-    setDepartamentoId(event.target.value);
+  // Abre modal al llegar al límite de tiempo
+  useEffect(() => {
+    if (tiempoTotal >= JORNADA_TOTAL_MINUTOS) {
+      setModalAbierto(true);
+    }
+  }, [tiempoTotal]);
+
+  // Limpia solo los campos del formulario (sin afectar al tiempoTotal ni al operario)
+  const limpiarCamposFormulario = () => {
+    setDepartamentoId("");
     setTarea("");
     setEsOtraTarea(false);
     setDescripcionOtraTarea("");
     setDescripcionError("");
+    // Operario se mantiene hasta que se cierre modal tras completar jornada
+    setCantidades("");
+    setCantidadesError("");
+    setTiempo("");
+    setTiempoError("");
     setErrorMessage("");
   };
 
-  // Manejar el cambio de la tarea seleccionada
-  const handleTareaChange = (event) => {
-    const tareaId = event.target.value;
-    setTarea(tareaId);
-    const tareaSeleccionada = tareas.find((t) => t.id === tareaId);
-    if (tareaSeleccionada && tareaSeleccionada.es_otra_tarea) {
-      setEsOtraTarea(true);
-    } else {
-      setEsOtraTarea(false);
-      setDescripcionOtraTarea("");
-      setDescripcionError("");
-    }
-    setErrorMessage("");
+  // Limpia todo al cerrar modal (incluido operario y tiempoTotal)
+  const limpiarTodoAlFinal = () => {
+    limpiarCamposFormulario();
+    setOperario("");
+    setOperarioError("");
+    setTiempoTotal(0);
+    setRegistros([]);
   };
 
-  // Manejar el cambio de la descripción de "otra tarea"
-  const handleDescripcionChange = (event) => {
-    const value = event.target.value;
-    setDescripcionOtraTarea(value);
-    if (esOtraTarea && value.trim() === "") {
-      setDescripcionError("La descripción es obligatoria para esta tarea");
-    } else {
-      setDescripcionError("");
-    }
-    setErrorMessage("");
+  const handleModalCerrar = () => {
+    setModalAbierto(false);
+    limpiarTodoAlFinal();
   };
 
-  // Manejar el cambio del operario
-  const handleOperarioChange = (event) => {
-    const value = event.target.value;
-    setOperario(value);
-    if (value.length > 4) {
-      setOperarioError("El código de operario debe tener máximo 4 caracteres");
-    } else {
-      setOperarioError("");
-    }
-    setErrorMessage("");
-  };
-
-  // Manejar el cambio de cantidades gestionadas
-  const handleCantidadesChange = (event) => {
-    const value = event.target.value;
-    if (/^\d*$/.test(value)) {
-      setCantidades(value);
-      if (value === "" || parseInt(value) <= 0) {
-        setCantidadesError("Debe introducir un número mayor que 0");
-      } else {
-        setCantidadesError("");
-      }
-    }
-    setErrorMessage("");
-  };
-
-  // Manejar el cambio del tiempo empleado
-  const handleTiempoChange = (event) => {
-    const value = event.target.value;
-    if (/^\d*$/.test(value)) {
-      setTiempo(value);
-      const tiempoNum = parseInt(value) || 0;
-      const nuevoTiempoTotal = tiempoTotal + tiempoNum;
-      if (value === "" || tiempoNum <= 0) {
-        setTiempoError("Debe introducir un número mayor que 0");
-      } else if (nuevoTiempoTotal > JORNADA_TOTAL_MINUTOS) {
-        setTiempoError(
-          `El tiempo total no puede exceder ${JORNADA_TOTAL_MINUTOS} minutos (restante: ${
-            JORNADA_TOTAL_MINUTOS - tiempoTotal
-          } minutos)`
-        );
-      } else {
-        setTiempoError("");
-      }
-    }
-    setErrorMessage("");
-  };
-
-  // Función para enviar un registro al backend
-  const saveToBackend = async (registro) => {
-    try {
-      const departamento = departamentos.find((dep) => dep.id === registro.departamentoId)?.nombre || "Desconocido";
-      const tareaNombre = tareas.find((t) => t.id === registro.tarea)?.nombre_tarea || "Desconocido";
-      const datos = {
-        operario: registro.operario,
-        departamento: departamento,
-        tarea: tareaNombre,
-        cantidades: registro.cantidades,
-        tiempo: registro.tiempo,
-        descripcion: registro.descripcionOtraTarea || "",
-      };
-      const response = await fetch(`${apiUrl}/shift/save-shift`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(datos),
-      });
-      if (!response.ok) {
-        throw new Error("Error al guardar el registro en el servidor");
-      }
-      return true;
-    } catch (error) {
-      throw new Error(`Error al enviar el registro al servidor: ${error.message}`);
-    }
-  };
-
-  // Función para manejar el envío del formulario
+  // Función de envío al backend y registro local
   const handleSubmit = async () => {
-    setErrorMessage(""); // Limpiar mensajes de error previos
+    setErrorMessage("");
+    // Validaciones en orden
+    if (!departamentoId) return setErrorMessage("Seleccione un departamento");
+    if (!operario || operario.length > 4) return setOperarioError("Entre 1 y 4 caracteres");
+    if (!tarea) return setErrorMessage("Seleccione una tarea");
+    if (esOtraTarea && !descripcionOtraTarea.trim()) return setDescripcionError("Descripción obligatoria");
+    const cNum = parseInt(cantidades) || 0;
+    if (!cNum) return setCantidadesError("Debe ser > 0");
+    const tNum = parseInt(tiempo) || 0;
+    if (!tNum) return setTiempoError("Debe ser > 0");
+    if (tiempoTotal + tNum > JORNADA_TOTAL_MINUTOS)
+      return setTiempoError(`Restan ${JORNADA_TOTAL_MINUTOS - tiempoTotal} minutos`);
 
-    // Validar el operario
-    if (operario.length > 4) {
-      setOperarioError("El código de operario debe tener máximo 4 caracteres");
-      return;
-    }
-
-    // Validar la descripción si es "otra tarea"
-    if (esOtraTarea && descripcionOtraTarea.trim() === "") {
-      setDescripcionError("La descripción es obligatoria para esta tarea");
-      return;
-    }
-
-    // Validar cantidades
-    const cantidadesNum = parseInt(cantidades) || 0;
-    if (cantidades === "" || cantidadesNum <= 0) {
-      setCantidadesError("Debe introducir un número mayor que 0");
-      return;
-    }
-
-    // Validar tiempo
-    const tiempoNum = parseInt(tiempo) || 0;
-    const nuevoTiempoTotal = tiempoTotal + tiempoNum;
-    if (tiempo === "" || tiempoNum <= 0) {
-      setTiempoError("Debe introducir un número mayor que 0");
-      return;
-    }
-    if (nuevoTiempoTotal > JORNADA_TOTAL_MINUTOS) {
-      setTiempoError(
-        `El tiempo total no puede exceder ${JORNADA_TOTAL_MINUTOS} minutos (restante: ${
-          JORNADA_TOTAL_MINUTOS - tiempoTotal
-        } minutos)`
-      );
-      return;
-    }
-
-    // Datos a enviar
-    const datos = {
-      departamentoId,
-      tarea,
-      operario,
-      cantidades: cantidadesNum,
-      tiempo: tiempoNum,
-      descripcionOtraTarea: esOtraTarea ? descripcionOtraTarea : undefined,
-    };
-
+    // Envío
     try {
-      // Enviar al backend
-      await saveToBackend(datos);
-
-      // Agregar el registro al array de registros
-      setRegistros([...registros, datos]);
-      setTiempoTotal(nuevoTiempoTotal);
-
-      // Limpiar los campos después del envío EXCEPTO el operario
-      setDepartamentoId("");
-      setTarea("");
-      setEsOtraTarea(false);
-      setDescripcionOtraTarea("");
-      setDescripcionError("");
-      setCantidades("");
-      setCantidadesError("");
-      setTiempo("");
-      setTiempoError("");
-      // No resetear el operario: setOperario("");
-    } catch (error) {
-      console.error("Error en handleSubmit:", error);
-      setErrorMessage(error.message);
+      await fetch(`${apiUrl}/shift/save-shift`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operario,
+          departamento: departamentos.find(d => d.id === departamentoId)?.nombre,
+          tarea: tareas.find(t => t.id === tarea)?.nombre_tarea,
+          cantidades: cNum,
+          tiempo: tNum,
+          descripcion: descripcionOtraTarea || "",
+        }),
+      });
+      setTiempoTotal(prev => prev + tNum);
+      setRegistros(prev => [...prev, { departamentoId, tarea, operario, cantidades: cNum, tiempo: tNum, descripcionOtraTarea }]);
+      limpiarCamposFormulario();
+    } catch {
+      setErrorMessage("Error al guardar el registro");
     }
   };
 
-  // Función para descargar el archivo Excel
-  const handleDownloadExcel = async () => {
-    setErrorMessage(""); // Limpiar mensajes de error previos
-    try {
-      // Abrir una nueva pestaña para descargar el archivo
-      window.open(`${apiUrl}/shift/download-excel`, "_blank");
-    } catch (error) {
-      console.error("Error al descargar el Excel:", error);
-      setErrorMessage("Error al descargar el archivo Excel");
-    }
+  const handleDownloadExcel = () => {
+    window.open(`${apiUrl}/shift/download-excel`, "_blank");
   };
 
   return (
-    <Box sx={{ padding: "16px" }}>
-      {/* Título */}
-      <Typography variant="h4" sx={{ textAlign: "center", marginBottom: "20px" }}>
+    <Box sx={{ p: 2 }}>
+      <Typography variant="h4" align="center" mb={2}>
         Bienvenido a la Administración GDELS
       </Typography>
-
-      {/* Mostrar tiempo acumulado y restante */}
-      <Typography variant="h6" sx={{ textAlign: "center", marginBottom: "20px" }}>
-        Tiempo acumulado: {tiempoTotal} minutos | Tiempo restante:{" "}
-        {Math.max(0, JORNADA_TOTAL_MINUTOS - tiempoTotal)} minutos
+      <Typography align="center" mb={2}>
+        Tiempo acumulado: {tiempoTotal} min | Restan: {Math.max(0, JORNADA_TOTAL_MINUTOS - tiempoTotal)} min
       </Typography>
-
-      {/* Mostrar mensaje de error si existe */}
       {errorMessage && (
-        <Typography variant="body1" color="error" sx={{ textAlign: "center", marginBottom: "20px" }}>
+        <Typography color="error" align="center" mb={2}>
           {errorMessage}
         </Typography>
       )}
 
-      {/* Select de departamentos */}
-      <FormControl fullWidth sx={{ marginBottom: "20px" }}>
-        <InputLabel id="departamento-select-label">Departamento</InputLabel>
+      {/* Departamento */}
+      <FormControl fullWidth sx={{ mb: 2 }}>
+        <InputLabel>Departamento</InputLabel>
         <Select
-          labelId="departamento-select-label"
-          id="departamento-select"
           value={departamentoId}
           label="Departamento"
-          onChange={handleDepartamentoChange}
-          disabled={tiempoTotal >= JORNADA_TOTAL_MINUTOS}
+          onChange={e => { setDepartamentoId(e.target.value); setErrorMessage(""); }}
+          disabled={modalAbierto}
         >
-          <MenuItem value="">
-            <em>Seleccione un departamento</em>
-          </MenuItem>
-          {departamentos.map((dep) => (
-            <MenuItem key={dep.id} value={dep.id}>
-              {dep.nombre}
-            </MenuItem>
+          <MenuItem value=""><em>Seleccione</em></MenuItem>
+          {departamentos.map(d => (
+            <MenuItem key={d.id} value={d.id}>{d.nombre}</MenuItem>
           ))}
         </Select>
       </FormControl>
 
-      {/* Select de tareas */}
-      <FormControl fullWidth sx={{ marginBottom: "20px" }} disabled={!departamentoId || tiempoTotal >= JORNADA_TOTAL_MINUTOS}>
-        <InputLabel id="tarea-select-label">Tarea</InputLabel>
+      {/* Operario */}
+      <FormControl fullWidth sx={{ mb: 2 }}>
+        <TextField
+          label="Código de Operario"
+          value={operario}
+          onChange={e => { setOperario(e.target.value); setOperarioError(""); }}
+          error={!!operarioError}
+          helperText={operarioError || "Máx. 4 caracteres"}
+          inputProps={{ maxLength: 4 }}
+          disabled={!departamentoId || modalAbierto}
+        />
+      </FormControl>
+
+      {/* Tarea */}
+      <FormControl fullWidth sx={{ mb: 2 }} disabled={!operario || modalAbierto}>
+        <InputLabel>Tarea</InputLabel>
         <Select
-          labelId="tarea-select-label"
-          id="tarea-select"
           value={tarea}
           label="Tarea"
-          onChange={handleTareaChange}
+          onChange={e => {
+            const id = e.target.value;
+            setTarea(id);
+            const sel = tareas.find(t => t.id === id);
+            setEsOtraTarea(!!sel?.es_otra_tarea);
+            setErrorMessage("");
+          }}
         >
-          <MenuItem value="">
-            <em>Seleccione una tarea</em>
-          </MenuItem>
-          {tareas.map((tarea) => (
-            <MenuItem key={tarea.id} value={tarea.id}>
-              {tarea.nombre_tarea}
-            </MenuItem>
+          <MenuItem value=""><em>Seleccione</em></MenuItem>
+          {tareas.map(t => (
+            <MenuItem key={t.id} value={t.id}>{t.nombre_tarea}</MenuItem>
           ))}
         </Select>
       </FormControl>
 
-      {/* Campo para la descripción de "otra tarea" (condicional) */}
+      {/* Descripción otra tarea (opcional) */}
       {esOtraTarea && (
-        <FormControl fullWidth sx={{ marginBottom: "20px" }}>
-          <TextField
-            id="descripcion-input"
-            label="Descripción de la Tarea"
-            variant="outlined"
-            value={descripcionOtraTarea}
-            onChange={handleDescripcionChange}
-            multiline
-            rows={3}
-            error={!!descripcionError}
-            helperText={descripcionError || "Explique la tarea realizada"}
-            disabled={tiempoTotal >= JORNADA_TOTAL_MINUTOS}
-          />
-        </FormControl>
+        <TextField
+          fullWidth
+          multiline
+          rows={3}
+          label="Descripción de la Tarea"
+          value={descripcionOtraTarea}
+          onChange={e => { setDescripcionOtraTarea(e.target.value); setErrorMessage(""); }}
+          error={!!descripcionError}
+          helperText={descripcionError}
+          disabled={modalAbierto}
+          sx={{ mb: 2 }}
+        />
       )}
 
-      {/* Campo para introducir operario */}
-      <FormControl fullWidth sx={{ marginBottom: "20px" }}>
+      {/* Cantidades */}
+      <FormControl fullWidth sx={{ mb: 2 }}>
         <TextField
-          id="operario-input"
-          label="Código de Operario"
-          variant="outlined"
-          value={operario}
-          onChange={handleOperarioChange}
-          inputProps={{ maxLength: 4 }}
-          error={!!operarioError}
-          helperText={operarioError || "Introduzca máximo 4 caracteres"}
-          disabled={tiempoTotal >= JORNADA_TOTAL_MINUTOS}
-        />
-      </FormControl>
-
-      {/* Campo para introducir cantidades gestionadas */}
-      <FormControl fullWidth sx={{ marginBottom: "20px" }}>
-        <TextField
-          id="cantidades-input"
           label="Cantidades Gestionadas"
-          variant="outlined"
           value={cantidades}
-          onChange={handleCantidadesChange}
-          type="text"
+          onChange={e => { const v = e.target.value.replace(/\D/g, ""); setCantidades(v); setErrorMessage(""); }}
           error={!!cantidadesError}
-          helperText={cantidadesError || "Introduzca un número entero"}
-          disabled={tiempoTotal >= JORNADA_TOTAL_MINUTOS}
+          helperText={cantidadesError}
+          disabled={!tarea || modalAbierto}
         />
       </FormControl>
 
-      {/* Campo para introducir tiempo empleado */}
-      <FormControl fullWidth sx={{ marginBottom: "20px" }}>
+      {/* Tiempo */}
+      <FormControl fullWidth sx={{ mb: 2 }}>
         <TextField
-          id="tiempo-input"
-          label="Tiempo Empleado (minutos)"
-          variant="outlined"
+          label="Tiempo Empleado (min)"
           value={tiempo}
-          onChange={handleTiempoChange}
-          type="text"
+          onChange={e => { const v = e.target.value.replace(/\D/g, ""); setTiempo(v); setErrorMessage(""); }}
           error={!!tiempoError}
-          helperText={
-            tiempoError ||
-            `Introduzca un número entero (máximo restante: ${
-              JORNADA_TOTAL_MINUTOS - tiempoTotal
-            } minutos)`
-          }
-          disabled={tiempoTotal >= JORNADA_TOTAL_MINUTOS}
+          helperText={tiempoError}
+          disabled={!cantidades || modalAbierto}
         />
       </FormControl>
 
-       {/* Botones */}
-       <Box sx={{ display: "flex", gap: "10px" }}>
+      {/* Botones */}
+      <Box sx={{ display: "flex", gap: 2 }}>
         <Button
           variant="contained"
-          color="primary"
+          color="error"
           fullWidth
           onClick={handleSubmit}
-          disabled={
-            !departamentoId ||
-            !tarea ||
-            !operario ||
-            !!operarioError ||
-            (esOtraTarea && !descripcionOtraTarea.trim()) ||
-            !!cantidadesError ||
-            !!tiempoError ||
-            tiempoTotal >= JORNADA_TOTAL_MINUTOS
-          }
+          disabled={modalAbierto}
         >
           Guardar
         </Button>
         <Button
-          variant="outlined"
-          color="primary"
+          variant="contained"
+          color="success"
           fullWidth
           onClick={handleDownloadExcel}
+          disabled={modalAbierto}
         >
           Descargar Excel
         </Button>
       </Box>
 
-      {/* Resumen de registros (mejorado para mostrar nombres) */}
-      {registros.length > 0 && (
-        <Box sx={{ marginTop: "20px" }}>
-          <Typography variant="h6">Registros Enviados:</Typography>
-          {registros.map((registro, index) => {
-            const departamentoNombre =
-              departamentos.find((dep) => dep.id === registro.departamentoId)?.nombre || "Desconocido";
-            const tareaNombre =
-              tareas.find((t) => t.id === registro.tarea)?.nombre_tarea || "Desconocido";
-            return (
-              <Typography key={index} variant="body2">
-                - Tarea {tareaNombre} (Depto: {departamentoNombre}) | Operario: {registro.operario} |
-                Cantidades: {registro.cantidades} | Tiempo: {registro.tiempo} min
-                {registro.descripcionOtraTarea && ` | Descripción: ${registro.descripcionOtraTarea}`}
-              </Typography>
-            );
-          })}
-        </Box>
-      )}
+      {/* Modal al finalizar jornada */}
+      <Dialog open={modalAbierto} onClose={handleModalCerrar}>
+        <DialogTitle>¡Jornada finalizada!</DialogTitle>
+        <DialogContent>
+          <Typography>No quedan minutos disponibles. No puedes realizar más tareas.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleModalCerrar}>Entendido</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
